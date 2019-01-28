@@ -1,0 +1,73 @@
+{
+  "manifest": {
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:ap-northeast-1:499547615188:function:myConcierge"
+        },
+        "interfaces": []
+      }
+    },
+    "manifestVersion": "1.0",
+    "permissions": [
+      {
+        "name": "alexa::devices:all:address:full:read"
+      },
+      {
+        "name": "alexa::profile:name:read"
+      },
+      {
+        "name": "alexa::profile:email:read"
+      },
+      {
+        "name": "alexa::profile:mobile_number:read"
+      },
+      {
+        "name": "alexa::devices:all:geolocation:read"
+      }
+    ],
+    "privacyAndCompliance": {
+      "locales": {
+        "ja-JP": {}
+      },
+      "allowsPurchases": false,
+      "usesPersonalInfo": true,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    },
+    "publishingInformation": {
+      "locales": {
+        "ja-JP": {
+          "name": "マイコンシェルジュ",
+          "summary": "マイコンシェルジュは、あなたの日々の生活をサポートします。アレクサに、「マイコンシェルジュで次の予定は」のように話しかけてみてください。",
+          "description": "マイコンシェルジュはあなたの生活をサポートする3つの機能を提供します。\n1つ目は、スケジュール管理機能です。あなたのその日の予定をお答えします。\nアレクサに「マイコンシェルジュで次の予定は」「マイコンシェルジュで今日の予定は」のように話しかけてみてください。\n※本機能を利用するためにはアカウントリンクを行う必要があります。詳しくは次のリンクをご参照ください。\n()\n2つ目は、移動時間の予測です。現在地から次の予定が行われる場所まで移動時間や、ご指定の場所へ移動する時間をお答えします。\nアレクサに「マイコンシェルジュで東京駅から大阪駅まで」「マイコンシェルジュで徒歩で東京駅まで」のように話しかけてみてください。\n\n3つ目は、おすすめのお店のご提案です。お近くのお店やこれから向かう目的地周辺のおすすめのお店をお答えします。\nアレクサに「マイコンシェルジュでおすすめのお店は」「マイコンシェルジュでお肉が食べたい」のように話しかけてみてください。",
+          "examplePhrases": [
+            "マイコンシェルジュで次の予定は",
+            "マイコンシェルジュで東京駅から大阪駅まで",
+            "マイコンシェルジュでおすすめのお店は"
+          ],
+          "keywords": [
+            "スケジュール",
+            "経路案内",
+            "経路探索",
+            "周辺検索",
+            "スケジュール管理",
+            "予定管理",
+            "予定",
+            "リコメンド",
+            "お店",
+            "店舗情報",
+            "店舗案内"
+          ]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "最初に、Googleカレンダーを利用するためGoogleアカウントでのアカウントリンクが必要になります。また、アカウントリンクで紐づいたGoogleカレンダーにあらかじめスケジュールをいくつか登録しいておくことでテストがスムーズに行えます。\nデバイスの位置情報を利用することがあるため、Alexaアプリから位置情報の登録も行なう必要があります。\n最初はLaunchインテントから起動し、アレクサの案内にしたがって受け答えを行なってください。\nその後、主要インテント(ScheduleIntent, DirectionsIntent, ShopIntent)をダイレクトに指定し機能テストを行なってください。\n各インテントの呼び出し例はスキルの詳細説明の方に記述してあります。\n本スキルは、スキルからの通知手段としてAWS SESを利用したEメールの送信を行います。アクセス権限でメールアドレスを許可してください。また~~~@gmail.comが迷惑メールとして認識されないようにメールアプリの設定を行なってください。",
+      "category": "EVENT_FINDERS",
+      "distributionCountries": [
+        "JP"
+      ]
+    }
+  }
+}

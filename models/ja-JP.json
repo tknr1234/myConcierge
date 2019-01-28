@@ -1,0 +1,232 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "マイコンシェルジュ",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": [
+            "もういいよ",
+            "もういい",
+            "結構",
+            "結構です",
+            "ない",
+            "ないよ",
+            "大丈夫",
+            "ありません"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": [
+            "終了"
+          ]
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "ScheduleIntent",
+          "slots": [],
+          "samples": [
+            "これからの予定は",
+            "次は",
+            "次の予定",
+            "次の予定は"
+          ]
+        },
+        {
+          "name": "DirectionsIntent",
+          "slots": [
+            {
+              "name": "direction",
+              "type": "AMAZON.City"
+            },
+            {
+              "name": "departure",
+              "type": "AMAZON.City"
+            },
+            {
+              "name": "transportation",
+              "type": "transportation"
+            }
+          ],
+          "samples": [
+            "{departure} から",
+            "{transportation} で {direction} まで",
+            "{transportation} で {departure} から {direction}",
+            "{departure} から {direction} ",
+            "どれくらいでつける",
+            "{direction} までどのくらい",
+            "目的地までどれくらい"
+          ]
+        },
+        {
+          "name": "ShopIntent",
+          "slots": [
+            {
+              "name": "keyword",
+              "type": "keyword"
+            },
+            {
+              "name": "location",
+              "type": "AMAZON.City"
+            }
+          ],
+          "samples": [
+            "{location} で {keyword} したい",
+            "{location} で {keyword} がしたい",
+            "{location} らへん",
+            "{keyword} がしたい",
+            "{keyword} が食べたい",
+            "{location} の近く",
+            "お腹すいた",
+            "近くのお店は",
+            "おすすめのお店は"
+          ]
+        },
+        {
+          "name": "OnlyDirectionsIntent",
+          "slots": [
+            {
+              "name": "location",
+              "type": "AMAZON.City"
+            }
+          ],
+          "samples": [
+            "{location}"
+          ]
+        },
+        {
+          "name": "AllScheduleIntent",
+          "slots": [],
+          "samples": [
+            "予定を教えて",
+            "今日の予定を教えて",
+            "今日の予定は"
+          ]
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": []
+        },
+        {
+          "name": "OtherShopIntent",
+          "slots": [],
+          "samples": [
+            "他には",
+            "別のお店がいい",
+            "他のお店は"
+          ]
+        },
+        {
+          "name": "TransportationIntent",
+          "slots": [
+            {
+              "name": "transportation",
+              "type": "transportation"
+            }
+          ],
+          "samples": [
+            "{transportation} だとどう",
+            "{transportation}  でどのくらい",
+            "{transportation} だと"
+          ]
+        },
+        {
+          "name": "AMAZON.NextIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.PreviousIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "values": [
+            {
+              "name": {
+                "value": "昼食"
+              }
+            },
+            {
+              "name": {
+                "value": "夕食"
+              }
+            },
+            {
+              "name": {
+                "value": "朝食"
+              }
+            },
+            {
+              "name": {
+                "value": "食べ物"
+              }
+            },
+            {
+              "name": {
+                "value": "観光"
+              }
+            },
+            {
+              "name": {
+                "value": "運動"
+              }
+            },
+            {
+              "name": {
+                "value": "肉"
+              }
+            }
+          ],
+          "name": "keyword"
+        },
+        {
+          "values": [
+            {
+              "name": {
+                "value": "公共交通機関",
+                "synonyms": [
+                  "地下鉄",
+                  "新幹線",
+                  "高速バス",
+                  "バス",
+                  "電車"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "徒歩",
+                "synonyms": [
+                  "歩く",
+                  "歩き"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "車",
+                "synonyms": [
+                  "自動車"
+                ]
+              }
+            }
+          ],
+          "name": "transportation"
+        }
+      ]
+    }
+  }
+}
