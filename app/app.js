@@ -13,6 +13,7 @@ const moment = require('moment')
 const YelpToken = process.env.yelpToken
 const MapsToken = process.env.mapsToken
 const fs = require('fs');
+const Util = require('./Util.js');
 
 const config = {
     logging: true,
@@ -27,8 +28,6 @@ const config = {
 
 const app = new App(config);
 
-let name = "あなた"
-
 
 // =================================================================================
 // App Logic
@@ -37,14 +36,40 @@ let name = "あなた"
 const alexaHandler = {
     'LAUNCH': async function() {
 
-        if (this.user().getName()) {
+        let namePermissionTell = ''
+        let name = 'あなた'
+
+        try {
             name = await this.user().getName()
-            console.log('名前' + '%j', name)
             name = name + "さん"
+        } catch (error) {
+            if (error.code === 'NO_USER_PERMISSION') {
+                name = "あなた"
+            } else {
+                console.log(error)
+            }
         }
+
+        let emailAdd = undefined
+        try {
+            emailAdd = await this.user().getEmail()
+        } catch (error) {
+            if (error.code === 'NO_USER_PERMISSION') {
+                emailAdd = undefined
+            } else {
+                console.log(error.code)
+            }
+        }
+        this.setSessionAttribute('email', emailAdd)
+
+        if (name === 'あなた') {
+            this.alexaSkill().showAskForContactPermissionCard('name')
+            namePermissionTell = 'また、名前へのアクセスを許可することであなたのお名前を呼ぶことが可能になります。アレクサアプリにご案内をお送りしました。'
+        }
+
+
         let m = moment()
         m = m.hours() + 9
-        console.log("現在時刻: " + m)
         let greet = "こんにちは。"
 
         if (m > 3 && m < 12) {
@@ -55,14 +80,18 @@ const alexaHandler = {
 
         this.setSessionAttribute('userName', name)
         this.setSessionAttribute('shopNumber', 0)
-        this.ask(greet + name + 'のためのコンシェルジュです。何をご所望ですか。私ができることを知りたいときはヘルプと言ってください。')
+        console.log("アレクサリクエスト: " + "%j", this.alexaSkill().request.context)
+        this.ask(greet + name + 'のためのコンシェルジュです。私ができることを知りたいときはヘルプと言ってください。' + namePermissionTell + '何をご所望ですか。')
     },
 
     'ScheduleIntent': async function() {
 
         //Google Calender API
         let token = this.getAccessToken()
-        console.log("トークン: " + token)
+        if (!token) {
+            this.showAccountLinkingCard().tell('アカウントリンクがされていないためスケジュールを取得できませんでした。この機能を実行するためにGoogleアカウントでアカウントリンクを行ってください。ご案内のカードをアレクサアプリにお送りしました。')
+            return
+        }
         let schedule = new Schedule(token)
         const date = undefined
         let events = undefined
@@ -70,11 +99,25 @@ const alexaHandler = {
             events = await schedule.getEvents(date)
             console.log("GoogleCalender取得情報: " + "%j", events)
         } catch (error) {
-            this.tell('アカウントリンクがされていないためスケジュールを取得できませんでした。このスキルを実行するためにアカウントリンクを行ってください。')
+            this.tell('問題が発生しました。時間を置いてから再度お試しください。')
             return
         }
+
+        let emailAdd = this.getSessionAttribute('email')
+        if (emailAdd == void 0) {
+            try {
+                emailAdd = await this.user().getEmail()
+            } catch (error) {
+                if (error.code === 'NO_USER_PERMISSION') {
+                    emailAdd = undefined
+                } else {
+                    console.log(error.code)
+                }
+            }
+        }
+        this.setSessionAttribute('email', emailAdd)
+
         events = JSON.parse(events)
-        console.log("結果: " + "%j", events)
         if (events.items.length == 0) {
             this.tell("今日これからの予定は特にありません。ゆっくりとおやすみください。")
         }
@@ -83,9 +126,11 @@ const alexaHandler = {
         if (moment().unix() >= startTime.unix()) {
             latestEvent = events.items[1]
         }
+        if (Util.isEmpty(latestEvent)) {
+            this.tell("今日これからの予定は特にありません。ゆっくりとおやすみください。")
+        }
         let loc = latestEvent.location
         this.setSessionAttribute('direction', loc)
-        console.log("位置情報: " + loc)
 
         let nextEvent = latestEvent.summary
         startTime = moment(latestEvent.start.dateTime).utcOffset("+09:00")
@@ -114,7 +159,10 @@ const alexaHandler = {
 
         //Google Calender API
         let token = this.getAccessToken()
-        console.log("トークン: " + token)
+        if (!token) {
+            this.showAccountLinkingCard().tell('アカウントリンクがされていないためスケジュールを取得できませんでした。この機能を実行するためにGoogleアカウントでアカウントリンクを行ってください。ご案内のカードをアレクサアプリにお送りしました。')
+            return
+        }
         let schedule = new Schedule(token)
         let date = undefined
         let events = undefined
@@ -122,11 +170,10 @@ const alexaHandler = {
             events = await schedule.getEvents(date)
             console.log("GoogleCalender取得情報: " + "%j", events)
         } catch (error) {
-            this.tell('アカウントリンクがされていないためスケジュールを取得できませんでした。このスキルを実行するためにアカウントリンクを行ってください。')
+            this.tell('問題が発生しました。時間を置いてから再度お試しください。')
             return
         }
         events = JSON.parse(events)
-        console.log("結果: " + "%j", events)
         if (events.items.length == 0) {
             this.tell("今日の予定は特にありません。ゆっくりとおやすみください。")
             return
@@ -134,7 +181,6 @@ const alexaHandler = {
         let allMessage = []
         events.items.forEach(function(event) {
             let loc = event.location
-            console.log("位置情報: " + loc)
             let startTime = moment(event.start.dateTime).utcOffset("+09:00")
             let startHour = startTime.hours()
             let startMin = startTime.minutes()
@@ -152,15 +198,30 @@ const alexaHandler = {
     },
 
     'DirectionsIntent': async function(direction = { "value": undefined }, departure = { "value": undefined }, transportation = { "value": undefined }) {
+        console.log("%j", this.alexaSkill().request)
         let way = "車"
         let transit = 'driving' //交通手段(transit, walking)
         let dirflg = 'd' //w = 徒歩、t = 公共交通機関
-        console.log("オールスロット: " + "%j", this.getInputs())
-        console.log("スロット(transportation): " + "%j", transportation)
 
         transportation = this.getInputs().transportation ? this.getInputs().transportation : transportation
         direction = this.getInputs().direction ? this.getInputs().direction : direction
         departure = this.getInputs().departure ? this.getInputs().departure : departure
+
+        let emailAdd = this.getSessionAttribute('email')
+        if (emailAdd == void 0) {
+            try {
+                emailAdd = await this.user().getEmail()
+            } catch (error) {
+                if (error.code === 'NO_USER_PERMISSION') {
+                    emailAdd = undefined
+                } else {
+                    console.log(error)
+                }
+            }
+        }
+        this.setSessionAttribute('email', emailAdd)
+
+        console.log('Eメールアドレス: ' + emailAdd)
 
         if (transportation.value == undefined && this.getSessionAttribute('transportation') == undefined) {
             console.log('移動手段指定なし')
@@ -194,10 +255,7 @@ const alexaHandler = {
         //Google Directions API
         let directions = new Directions(MapsToken)
         let getDirect = this.getSessionAttribute('direction')
-        console.log("目的地: " + "%j", getDirect)
 
-        console.log("スロット(direction): " + "%j", direction)
-        console.log("attribute: " + "%j", getDirect)
         if (direction.value == void 0 && getDirect == undefined) {
             this.followUpState('DirectionsState').ask("目的地を取得できませんでした。目的地を教えてください。")
             return
@@ -205,22 +263,69 @@ const alexaHandler = {
             getDirect = direction.value
         }
         this.setSessionAttribute('direction', getDirect)
+        this.setSessionAttribute('location', getDirect)
 
-        let nowLocation = await this.user().getDeviceAddress()
-        console.log("スロット(departure): " + '%j', departure)
-        console.log("デバイス位置: " + '%j', nowLocation)
+        let nowLocation = {}
+        let locPermission = false
+        let noLocationPermissionMessage = ''
+        let noLocationSettingMessage = ''
+        try {
+            nowLocation = await this.user().getDeviceAddress()
+            console.log(nowLocation)
+            locPermission = true
+            if (0 === Object.keys(nowLocation).length || Util.isEmpty(nowLocation.stateOrRegion)) {
+                nowLocation = {}
+                noLocationSettingMessage = 'デバイスの住所は許可されていますが、デバイスの住所が登録されていないか、無効な住所が登録されています。アレクサアプリよりデバイスの住所を設定してください。'
+            }
+        } catch (error) {
+            if (error.code === 'NO_USER_PERMISSION' || error.code === 'ACCESS_NOT_REQUESTED') {
+                nowLocation = {}
+                noLocationSettingMessage = 'デバイスの住所の権限を許可することで、位置を指定しなくてもお調べすることが可能になります。アレクサアプリにご案内をお送りしました。'
+            } else {
+                console.log('DeviceAddress: ' + error.code)
+            }
+            locPermission = false
+        }
+        if (this.alexaSkill().request.context.System.device.supportedInterfaces.Geolocation) {
+            if (this.alexaSkill().request.context.Geolocation) {
+                const geo = this.alexaSkill().request.context.Geolocation.coordinate
+                locPermission = false
+                let origin = String(geo.latitudeInDegrees) + ',' + String(geo.longitudeInDegrees)
+                nowLocation = origin
+            } else if (Util.isEmpty(this.alexaSkill().request.context.Geolocation) && this.alexaSkill().request.session.user.permissions.scopes['alexa::devices:all:geolocation:read'].status == "DENIED") {
+                noLocationPermissionMessage = '位置情報サービスを許可することで位置を指定しなくてもお調べすることが可能になります。アレクサアプリにご案内をお送りしました。それでは'
+                this.alexaSkill().response.responseObj.response.card = {
+                    "type": "AskForPermissionsConsent",
+                    "permissions": [
+                        "read::alexa:device:all:geolocation"
+                    ]
+                }
+            }
+        } else {
+            let cantUseLocationService = ''
+            if (locPermission) {
+                this.alexaSkill().showAskForAddressCard()
+            }
+            if (this.alexaSkill().request.session.user.permissions.scopes['alexa::devices:all:geolocation:read'].status == "GRANTED") {
+                cantUseLocationService = 'お使いの端末では位置情報サービスをお使いいただくことができないため、一部機能が制限されています。'
+            }
+            noLocationPermissionMessage = cantUseLocationService + noLocationSettingMessage + 'それでは'
+        }
+
         if (0 === Object.keys(nowLocation).length && departure.value == void 0 && this.getSessionAttribute('departure') == void 0) {
-            this.followUpState('DirectionsState').ask("デバイスの位置情報が取得できませんでした。現在地を教えてください。")
+            this.followUpState('DirectionsState').ask("デバイスの位置情報が取得できませんでした。" + noLocationPermissionMessage +
+                "現在地を教えてください。", "デバイスの位置情報が取得できませんでした。現在地を教えてください。")
             return
         } else if (this.getSessionAttribute('departure') != undefined && 0 === Object.keys(nowLocation).length && departure.value == void 0) {
             nowLocation = this.getSessionAttribute('departure')
-        } else if (this.getSessionAttribute('departure') == undefined && 0 !== Object.keys(nowLocation).length && departure.value == void 0) {
+        } else if (this.getSessionAttribute('departure') == undefined && 0 !== Object.keys(nowLocation).length && departure.value == void 0 && locPermission == true) {
             nowLocation = nowLocation.stateOrRegion + "" + nowLocation.city + "" + nowLocation.addressLine1
+        } else if (this.getSessionAttribute('departure') == undefined && 0 !== Object.keys(nowLocation).length && departure.value == void 0 && locPermission == false) {
+            nowLocation = nowLocation
         } else {
             nowLocation = departure.value
         }
 
-        console.log("現在地: " + '%j', nowLocation)
         this.setSessionAttribute('departure', nowLocation)
         let departure_time = undefined
         let duration = undefined
@@ -239,19 +344,14 @@ const alexaHandler = {
         }
         console.log("directionsResult: " + "%j", directionsResult)
         duration = directionsResult.routes[0].legs[0].duration.text
-        duration = duration.replace("hours", "時間").replace("mins", "分").replace("hour", "時間").replace("min", "分")
-        console.log("所要時間: " + "%j", duration)
+        duration = duration.replace("hours", "時間").replace("mins", "分").replace("hour", "時間").replace("min", "分").replace("days", "日と").replace("day", "日と")
 
 
         departure_time = this.getSessionAttribute('startTime') && directionsResult.routes[0].legs[0].departure_time ? directionsResult.routes[0].legs[0].departure_time.value : undefined
 
-        console.log(directionsResult.routes[0].legs[0].departure_time)
-        console.log("出発推奨時間: " + departure_time)
-
+        let durationDay = duration.split("日")
         let durationHour = duration.split("時間")
         let durationMin = duration.split("分")
-
-        console.log(durationHour, durationMin)
 
         if (durationHour.length > 1) {
             durationHour = durationHour[0]
@@ -266,7 +366,7 @@ const alexaHandler = {
             durationMin = duration.split("分")[0]
         }
 
-        console.log(durationHour, durationMin)
+        console.log(durationDay, durationHour, durationMin)
 
         let now = moment()
         let eventTime = moment(this.getSessionAttribute('startTime'))
@@ -276,8 +376,8 @@ const alexaHandler = {
         let durationDiff = timeDiff - durationSum
 
         console.log("余裕時間: " + Number(durationDiff))
-        let directionUrl = "https://www.google.com/maps/dir/?api=1&origin=" + nowLocation + "&destination=" + getDirect + "&dirflg=" + dirflg
-        let emailAdd = await this.user().getEmail()
+        let directionUrl = "http://maps.google.com/maps?saddr=" + nowLocation + "&daddr=" + getDirect + "&dirflg=" + dirflg
+
         let body = fs.readFileSync('./app/html/hero.html', 'utf8')
 
         let depTimeText = ""
@@ -287,31 +387,36 @@ const alexaHandler = {
             console.log(depTimeText)
         }
 
-        if (durationDiff >= 30) {
+        if (durationDiff >= 30 && durationDay.length <= 1) {
             if (emailAdd == undefined) {
-                this.showSimpleCard("経路リンク", directionUrl).followUpState('DirectionsState').ask("目的地までの所要時間は" + way + "でおよそ" + duration + "です。" + depTimeText + String(durationDiff) + "分程度余裕があります。目的地周辺でお食事などはいかがでしょうか。")
+                this.alexaSkill().showAskForContactPermissionCard('email')
+                this.followUpState('DirectionsState').ask("目的地までの所要時間は" + way + "でおよそ" + duration + "です。" + depTimeText + "メールアドレスへのアクセスを許可すると経路情報をメールで送信いたします。アレクサアプリにご案内をお送りしました。" + String(durationDiff) + "分程度余裕があります。目的地周辺でお食事などはいかがでしょうか。")
+                return
             }
             let mail = new Mail()
             let setBody = body.replace(/\n/g, '').replace(/\t/g, '')
-            let mbody = setBody.replace(/TitleHeadTwo/g, "マイコンシェルジュ")
-                .replace(/ExplainOne/g, "マイコンシェルジュのご利用ありがとうございます。")
-                .replace(/TitleHeadThree/g, "経路情報")
+            let mbody = setBody.replace(/TitleHeadTwo/g, "ユニークコンシェルジュ")
+                .replace(/ExplainOne/g, "ユニークコンシェルジュのご利用ありがとうございます。")
+                .replace(/TitleHeadThree/g, "")
                 .replace(/ShopImage/g, "")
                 .replace(/ShopGuide/g, "")
                 .replace(/HomePage/g, "")
                 .replace(/ExplainTwo/g, "現在地から目的地までの距離は下記のリンクからご確認ください。")
                 .replace(/MapURL/g, directionUrl)
 
-            await mail.sendMail(emailAdd, "マイコンシェルジュ 経路情報", mbody)
-            this.showSimpleCard("経路リンク", directionUrl).followUpState('DirectionsState').ask("目的地までの所要時間は" + way + "でおよそ" + duration + "です。" + depTimeText + "経路情報をメールでお送りしました。" + String(durationDiff) + "分程度余裕があります。目的地周辺でお食事などはいかがでしょうか。")
+            await mail.sendMail(emailAdd, "ユニークコンシェルジュ 経路情報", mbody)
+            this.followUpState('DirectionsState').ask("目的地までの所要時間は" + way + "でおよそ" + duration + "です。" + depTimeText + "経路情報をメールでお送りしました。" + String(durationDiff) + "分程度余裕があります。目的地周辺でお食事などはいかがでしょうか。")
+            return
         } else {
             if (emailAdd == undefined) {
-                this.showSimpleCard("経路リンク", directionUrl).followUpState('DirectionsState').ask("目的地までの所要時間は" + way + "でおよそ" + duration + "です。" + depTimeText)
+                this.alexaSkill().showAskForContactPermissionCard('email')
+                this.followUpState('DirectionsState').tell("目的地までの所要時間は" + way + "でおよそ" + duration + "です。" + depTimeText + "メールアドレスへのアクセスを許可すると経路情報をメールで送信いたします。アレクサアプリにご案内をお送りしました。")
+                return
             }
             let mail = new Mail()
             let setBody = body.replace(/\n/g, '').replace(/\t/g, '')
-            let mbody = setBody.replace(/TitleHeadTwo/g, "マイコンシェルジュ")
-                .replace(/ExplainOne/g, "マイコンシェルジュのご利用ありがとうございます。")
+            let mbody = setBody.replace(/TitleHeadTwo/g, "ユニークコンシェルジュ")
+                .replace(/ExplainOne/g, "ユニークコンシェルジュのご利用ありがとうございます。")
                 .replace(/TitleHeadThree/g, "経路情報")
                 .replace(/ShopImage/g, "")
                 .replace(/ShopGuide/g, "")
@@ -320,9 +425,9 @@ const alexaHandler = {
                 .replace(/MapURL/g, directionUrl)
 
             console.log("ファイルの中身: ", mbody)
-            // await mail.sendMail(emailAdd, "マイコンシェルジュ 経路情報", "<a href='" + directionUrl + "'>経路リンク</a>")
-            await mail.sendMail(emailAdd, "マイコンシェルジュ 経路情報", mbody)
-            this.showSimpleCard("経路リンク", directionUrl).tell("目的地までの所要時間は" + way + "でおよそ" + duration + "です。経路情報をメールでお送りしました。" + depTimeText)
+            // await mail.sendMail(emailAdd, "ユニークコンシェルジュ 経路情報", "<a href='" + directionUrl + "'>経路リンク</a>")
+            await mail.sendMail(emailAdd, "ユニークコンシェルジュ 経路情報", mbody)
+            this.tell("目的地までの所要時間は" + way + "でおよそ" + duration + "です。経路情報をメールでお送りしました。" + depTimeText)
         }
     },
 
@@ -375,6 +480,20 @@ const alexaHandler = {
         keyword = this.getInputs().keyword ? this.getInputs().keyword : keyword
         location = this.getInputs().location ? this.getInputs().location : location
 
+        let emailAdd = this.getSessionAttribute('email')
+        if (emailAdd == void 0) {
+            try {
+                emailAdd = await this.user().getEmail()
+            } catch (error) {
+                if (error.code === 'NO_USER_PERMISSION') {
+                    emailAdd = undefined
+                } else {
+                    console.log(error.code)
+                }
+            }
+        }
+        this.setSessionAttribute('email', emailAdd)
+
         let category = null
         if (keyword.value == void 0) {
             keyword = this.getSessionAttribute('keyword') == void 0 ? null : this.getSessionAttribute('keyword')
@@ -383,21 +502,89 @@ const alexaHandler = {
             keyword = keyword.value
             this.setSessionAttribute('keyword', keyword)
         }
-        let getLocation = this.getSessionAttribute('direction')
+
+        let getLocation = undefined
+        let deviceAdd = false
+
+        let noLocationPermissionMessage = ''
+        let noLocationSettingMessage = ''
+
+        try {
+            getLocation = await this.user().getDeviceAddress()
+            console.log('デバイスの住所: ' + '%j', getLocation)
+            deviceAdd = true
+            if (0 === Object.keys(getLocation).length || Util.isEmpty(getLocation.stateOrRegion)) {
+                getLocation = void 0
+                noLocationSettingMessage = 'デバイスの住所は許可されていますが、デバイスの住所が登録されていないか、無効な住所が登録されています。アレクサアプリよりデバイスの住所を設定してください。'
+            }
+        } catch (error) {
+            if (error.code === 'NO_USER_PERMISSION' || error.code === 'ACCESS_NOT_REQUESTED') {
+                getLocation = undefined
+                noLocationSettingMessage = 'デバイスの住所の権限を許可することで、位置を指定しなくても周辺情報をお調べすることが可能になります。アレクサアプリにご案内をお送りしました。'
+            } else {
+                console.log(error)
+            }
+            deviceAdd = false
+        }
+
+        let geoflag = false
+        if (this.alexaSkill().request.context.System.device.supportedInterfaces.Geolocation) {
+            if (location.value == void 0 && this.alexaSkill().request.context.Geolocation) {
+                const geo = this.alexaSkill().request.context.Geolocation.coordinate
+                let origin = String(geo.latitudeInDegrees) + ',' + String(geo.longitudeInDegrees)
+                getLocation = origin
+                deviceAdd = false
+                geoflag = true
+            } else if (location.value == void 0 && Util.isEmpty(this.alexaSkill().request.context.Geolocation) && this.alexaSkill().request.session.user.permissions.scopes['alexa::devices:all:geolocation:read'].status == "DENIED") {
+                noLocationPermissionMessage = '位置情報サービスを許可することで位置を指定しなくてもお調べすることが可能になります。アレクサアプリにご案内をお送りしました。それでは'
+                this.alexaSkill().response.responseObj.response.card = {
+                    "type": "AskForPermissionsConsent",
+                    "permissions": [
+                        "read::alexa:device:all:geolocation"
+                    ]
+                }
+            }
+        } else {
+            let cantUseLocationService = ''
+            if (deviceAdd) {
+                this.alexaSkill().showAskForAddressCard()
+            }
+            if (this.alexaSkill().request.session.user.permissions.scopes['alexa::devices:all:geolocation:read'].status == "GRANTED") {
+                cantUseLocationService = 'お使いの端末では位置情報サービスをお使いいただくことができないため、一部機能が制限されています。'
+            }
+            noLocationPermissionMessage = cantUseLocationService + noLocationSettingMessage + 'それでは'
+        }
+
         console.log("スロット(location): " + "%j", location)
         console.log("attribute: " + "%j", getLocation)
+        let fromOtherIntent = false
+        let locationVal = ''
+
         if (location.value == void 0 && getLocation == undefined && this.getSessionAttribute('location') == undefined) {
-            this.followUpState('ShopState').ask("位置情報が取得できませんでした。どこのお店を調べますか。")
+            this.followUpState('ShopState').ask("位置情報が取得できませんでした。" + noLocationPermissionMessage +
+                "どこのお店を調べますか。", "位置情報が取得できませんでした。どこのお店を調べますか。")
             return
-        } else if (location.value == void 0 && getLocation == undefined && this.getSessionAttribute('location') != undefined) {
+        } else if (location.value == void 0 && this.getSessionAttribute('location') != undefined) {
             getLocation = this.getSessionAttribute('location')
-        }
-         else if (location.value != undefined) {
+            fromOtherIntent = true
+        } else if (location.value != undefined) {
             getLocation = location.value
+            geoflag = false
+        } else if (location.value == void 0 && getLocation != void 0) {
+            if (deviceAdd == true) {
+                getLocation = getLocation.stateOrRegion + "" + getLocation.city + "" + getLocation.addressLine1
+            } else {
+                getLocation = getLocation
+            }
+        }
+
+        if (geoflag == false) {
+            locationVal = getLocation
         }
 
         this.setSessionAttribute('location', getLocation)
 
+        console.log("deviceAdd: " + "%j", deviceAdd)
         console.log("指定場所: " + "%j", getLocation)
         let shop = undefined
         try {
@@ -426,8 +613,21 @@ const alexaHandler = {
         this.setSessionAttribute('shopNumber', shopNum)
         console.log("お店: " + "%j", shop.businesses[shopNum])
         this.setSessionAttribute('shopInfo', shop.businesses[shopNum])
+        if (shop.businesses.length - 1 < shopNum) {
+            this.ask("これ以上周辺のお店をみつけられませんでした。他に知りたいことはありますか。")
+        }
 
-        this.followUpState('ShopState').ask("目的地周辺にあるおすすめのお店は、" + shop.businesses[shopNum].name + "です。いかがでしょうか。");
+        let shopName = shop.businesses[shopNum].alias
+        shopName = shopName.split('-')
+        shopName.pop()
+        console.log(shopName)
+        shopName = shopName.join('')
+
+        if (fromOtherIntent == true) {
+            this.followUpState('ShopState').ask("目的地周辺にあるおすすめのお店は、" + shopName + "です。いかがでしょうか。");
+        } else {
+            this.followUpState('ShopState').ask(locationVal + "周辺にあるおすすめのお店は、" + shopName + "です。いかがでしょうか。");
+        }
     },
 
     'ShopState': {
@@ -443,31 +643,40 @@ const alexaHandler = {
             }
         },
         'YesIntent': async function() {
+            console.log("ShopState: YesIntentに入りました。")
             let mail = new Mail()
-            let emailAdd = await this.user().getEmail()
-            if (emailAdd == undefined) {
-                this.tell("メールアドレスへのアクセス権限を有効にすることでお店の情報をメールで受け取ることができます。アクセス権限はアレクサアプリより設定できます。")
+            let emailAdd = this.getSessionAttribute('email')
+            console.log('stateの中: ' + emailAdd)
+            if (emailAdd == void 0) {
+                this.alexaSkill().showAskForContactPermissionCard('email')
+                this.tell("メールアドレスへのアクセス権限を有効にすることでお店の情報をメールで受け取ることができます。アレクサアプリにご案内をお送りしました。")
                 return
             }
+
             let body = fs.readFileSync('./app/html/hero.html', 'utf8')
 
             let shopInfo = this.getSessionAttribute('shopInfo')
-            const shopName = shopInfo.name
+            // const shopName = shopInfo.name
+            let shopName = shopInfo.alias
+            shopName = shopName.split('-')
+            shopName.pop()
+            shopName = shopName.join('')
             const shopImg = shopInfo.image_url
             const shopUrl = shopInfo.url
             const shoploc = "http://maps.google.com/maps?q=" + String(shopInfo.coordinates.latitude) + "," + String(shopInfo.coordinates.longitude)
 
             let setBody = body.replace(/\n/g, '').replace(/\t/g, '')
-            let mbody = setBody.replace(/TitleHeadTwo/g, "マイコンシェルジュ")
-                .replace(/ExplainOne/g, "マイコンシェルジュのご利用ありがとうございます。")
+            let mbody = setBody.replace(/TitleHeadTwo/g, "ユニークコンシェルジュ")
+                .replace(/ExplainOne/g, "ユニークコンシェルジュのご利用ありがとうございます。")
                 .replace(/TitleHeadThree/g, shopName)
                 .replace(/ShopImage/g, shopImg)
                 .replace(/ShopGuide/g, "お店の詳しい情報は次のリンクをご確認ください。")
-                .replace(/HomePage/g, shopUrl)
+                .replace(/ShopUrl/g, shopUrl)
+                .replace(/HomePage/g, "詳細情報")
                 .replace(/ExplainTwo/g, "お店の詳しい位置は下記のリンクからご確認ください。")
                 .replace(/MapURL/g, shoploc)
 
-            await mail.sendMail(emailAdd, "マイコンシェルジュ 店舗情報", mbody)
+            await mail.sendMail(emailAdd, "ユニークコンシェルジュ 店舗情報", mbody)
             this.tell("お店の情報をメールでお送りしました。")
         },
         'OtherShopIntent': function() {
@@ -479,7 +688,7 @@ const alexaHandler = {
     },
 
     'HelpIntent': function() {
-        this.ask("マイコンシェルジュではあなたのスケジュールをあなたの代わりに管理いたします。直近の予定が知りたい場合はマイコンシェルジュで「次の予定は」と聞いてみてください。さらに詳しい情報が知りたいときはアレクサアプリのスキルページを参照してください。")
+        this.ask("ユニークコンシェルジュではあなたのスケジュールをあなたの代わりに管理いたします。直近の予定が知りたい場合はユニークコンシェルジュで「次の予定は」と聞いてみてください。さらに詳しい情報が知りたいときはアレクサアプリのスキルページを参照してください。")
     },
 
     'CancelIntent': function() {
@@ -495,7 +704,7 @@ const alexaHandler = {
     },
 
     'END': function() {
-        this.tell("良い一日をお過ごしください。")
+        this.tell("またのご利用をお待ちしてます。")
     },
 
 }
@@ -506,7 +715,7 @@ const googleHandler = {
     },
 
     'WelcomeIntent': function() {
-        // this.googleAction().askForName("マイコンシェルジュです。ユーザーデータへのアクセスを許可してください。")
+        // this.googleAction().askForName("ユニークコンシェルジュです。ユーザーデータへのアクセスを許可してください。")
 
         // if (this.user().getName()) {
         //     name = await this.user().getName()
@@ -544,7 +753,7 @@ const googleHandler = {
     },
 
     'END': function() {
-        this.tell("良い一日をお過ごしください。")
+        this.tell("またのご利用をお待ちしてます。")
     }
 }
 

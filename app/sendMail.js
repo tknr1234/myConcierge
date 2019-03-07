@@ -8,7 +8,7 @@ module.exports = class Mail {
         const ses = new SDK.SES({ region: 'us-east-1' });
         const email = {
             // From
-            Source: "chkyj_st_titabash@yahoo.co.jp",
+            Source: "service.myconcierge@gmail.com",
             // To
             Destination: { ToAddresses: [mailAddress] },
             Message: {

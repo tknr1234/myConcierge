@@ -17,7 +17,7 @@ module.exports = class YelpFusion {
                 'location': location,
                 'sort_by': 'distance',
                 'categories':categories,
-                'limit': 20
+                'limit': 10
             }).then(response => {
                 resolve(response.jsonBody)
             }).catch(e => {
